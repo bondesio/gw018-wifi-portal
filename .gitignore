@@ -1,0 +1,17 @@
+# Vendor SDK build output and generated images
+build/
+image/
+*.bin
+*.elf
+*.map
+*.o
+*.a
+*.d
+*.i
+*.su
+__pycache__/
+
+# Local-only build configuration and captures
+local_config.h
+*.log
+*.pcap

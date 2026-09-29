@@ -1,0 +1,243 @@
+diff --git a/component/common/example/ota_http/example_ota_http.c b/component/common/example/ota_http/example_ota_http.c
+index 88fe3c014d96ae4c112276f9114358e8e60e94e1..d2854b320367e9a6ab72333b6a86765d6eb18554 100644
+--- a/component/common/example/ota_http/example_ota_http.c
++++ b/component/common/example/ota_http/example_ota_http.c
+@@ -17,7 +17,8 @@
+ #endif
+ #include <wifi_constants.h>
+ #include "wifi_conf.h"
+-#include "gpio_api.h"
++#include "gpio_api.h"
++#include "gw018_portal.h"
+ 
+ #define LED_BLUE   _PB_22 	//Blue LED
+ #define PUSH_BTN   _PB_23 	//Push button
+@@ -50,49 +51,37 @@ void http_update_ota_task(void *param){
+ 	
+ 	printf("\n\r\n\r\n\r\n\r<<<<<< OTA HTTP Example >>>>>>>\n\r\n\r\n\r\n\r");
+ 
+-	vTaskDelay(5000);
+-
+-	int counter = 0;
+-
+-	while(1) {
+-
+-        if (gpio_read(&push_btn)) {
+-			if (counter > 0) {
+-            	gpio_write(&led_blue, 0);
+-				counter = 0;
+-			}
+-			vTaskDelay(1000);
+-            continue;
+-        } 
+-		
+-		if (counter < 3) {
+-			// turn on LED
+-            gpio_write(&led_blue, 1);
+-			counter++;
+-			printf("button pressed, counting to 3 ...\n");
+-			vTaskDelay(1000);
+-			continue;
+-		}
+-
+-		printf("let's start ota update ...\n");
+-		break;
+-	}
+-
+-	while(wifi_is_ready_to_transceive(RTW_STA_INTERFACE) != RTW_SUCCESS){
+-		printf("Wait for WIFI connection ...\n");
+-		vTaskDelay(1000);
+-	}
+-
+-	int ret = -1;
+-	ret = http_update_ota(HOST, PORT, RESOURCE);
+-
+-
+-	printf("\n\r[%s] Update task exit", __FUNCTION__);
+-	if(!ret){
+-		printf("\n\r[%s] Ready to reboot", __FUNCTION__);	
+-		ota_platform_reset();
+-	}
+-	vTaskDelete(NULL);	
++	vTaskDelay(pdMS_TO_TICKS(5000));
++	int down = 0;
++	int long_press_done = 0;
++	TickType_t pressed_at = 0;
++	for (;;) {
++		int now_down = !gpio_read(&push_btn);
++		TickType_t now = xTaskGetTickCount();
++		if (now_down && !down) {
++			down = 1;
++			long_press_done = 0;
++			pressed_at = now;
++			gpio_write(&led_blue, 1);
++		} else if (now_down && down && !long_press_done &&
++		           (TickType_t)(now - pressed_at) >= pdMS_TO_TICKS(3000)) {
++			long_press_done = 1;
++			printf("GW018: long press, starting OTA update\n");
++			while (wifi_is_ready_to_transceive(RTW_STA_INTERFACE) != RTW_SUCCESS)
++				vTaskDelay(pdMS_TO_TICKS(1000));
++			int ret = http_update_ota(HOST, PORT, RESOURCE);
++			if (ret == 0) ota_platform_reset();
++			printf("GW018: OTA update failed; button remains available\n");
++		} else if (!now_down && down) {
++			TickType_t held = now - pressed_at;
++			down = 0;
++			gpio_write(&led_blue, 0);
++			if (!long_press_done && held >= pdMS_TO_TICKS(60) &&
++			    held <= pdMS_TO_TICKS(1200)) gw018_portal_toggle();
++		}
++		gw018_portal_tick();
++		vTaskDelay(pdMS_TO_TICKS(50));
++	}
+ }
+ 
+ 
+diff --git a/component/common/example/socket_tcp_trx/example_socket_tcp_trx_1.c b/component/common/example/socket_tcp_trx/example_socket_tcp_trx_1.c
+index 15845fb160402a645b99664039484087042b854e..43cbd15871deca5f26b7046c3be08f2eddfb7167 100644
+--- a/component/common/example/socket_tcp_trx/example_socket_tcp_trx_1.c
++++ b/component/common/example/socket_tcp_trx/example_socket_tcp_trx_1.c
+@@ -1,13 +1,17 @@
+ #include "FreeRTOS.h"
+ #include "task.h"
+ #include <platform/platform_stdlib.h>
+-#include <lwip/sockets.h>
++#include <lwip/sockets.h>
++#include <lwip_netconf.h>
++#include <wifi_conf.h>
+ //#include <osdep_api.h>
+ #include <osdep_service.h>
+ #include "serial_api.h"
+ #include "serial_ex_api.h"
+ 
+-#include "gpio_api.h"   // mbed
++#include "gpio_api.h"   // mbed
++
++extern struct netif xnetif[NET_IF_NUM];
+ 
+ #define SERVER_PORT     80
+ #define LISTEN_QLEN     2
+@@ -162,9 +166,9 @@ exit:
+ 
+ static void example_socket_tcp_trx_thread(void *param)
+ {
+-	int server_fd = -1, client_fd = -1;
+-	struct sockaddr_in server_addr, client_addr;
+-	size_t client_addr_size;
++	int server_fd = -1, client_fd = -1;
++	struct sockaddr_in server_addr, client_addr;
++	socklen_t client_addr_size;
+ 
+ 	// Delay to wait for IP by DHCP
+ 	int counter = 0;
+@@ -187,10 +191,15 @@ static void example_socket_tcp_trx_thread(void *param)
+ 	printf("\nExample: socket tx/rx 1\n");
+ 	// gpio_write(&led_blue, 1); // uncomment to turn on blue LED permanently
+ 
+-	server_fd = socket(AF_INET, SOCK_STREAM, 0);
+-	server_addr.sin_family = AF_INET;
+-	server_addr.sin_port = htons(SERVER_PORT);
+-	server_addr.sin_addr.s_addr = INADDR_ANY;
++	/* Bind the Zigbee UART bridge only to the station IP. The setup AP has
++	 * its own independent HTTP listener on 192.168.43.1:80. */
++	while (wifi_is_ready_to_transceive(RTW_STA_INTERFACE) != RTW_SUCCESS ||
++	       ip_addr_get_ip4_u32(netif_ip_addr4(&xnetif[0])) == 0)
++		vTaskDelay(pdMS_TO_TICKS(100));
++	server_fd = socket(AF_INET, SOCK_STREAM, 0);
++	server_addr.sin_family = AF_INET;
++	server_addr.sin_port = htons(SERVER_PORT);
++	server_addr.sin_addr.s_addr = ip_addr_get_ip4_u32(netif_ip_addr4(&xnetif[0]));
+ 
+ 	if(bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
+ 		printf("ERROR: bind\n");
+@@ -202,38 +211,37 @@ static void example_socket_tcp_trx_thread(void *param)
+ 		goto exit;
+ 	}
+ 
+-	while(1) {
+-		client_addr_size = sizeof(client_addr);
+-		client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_size);
+-
+-		if(client_fd >= 0) {
+-			tx_exit = 1;
+-			rx_exit = 1;
+-			rtw_init_sema(&tcp_tx_rx_sema, 1);
+-
+-			if(xTaskCreate(tx_thread, ((const char*)"tx_thread"), 512, &client_fd, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
+-				printf("\n\r%s xTaskCreate(tx_thread) failed", __FUNCTION__);
+-			else
+-				tx_exit = 0;
+-
+-			// vTaskDelay(10);
+-
+-			if(xTaskCreate(rx_thread, ((const char*)"rx_thread"), 512, &client_fd, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
+-				printf("\n\r%s xTaskCreate(rx_thread) failed", __FUNCTION__);
+-			else
+-				rx_exit = 0;
+-
+-			while(1) {
+-				if(tx_exit && rx_exit) {
+-					close(client_fd);
+-					break;
+-				}
+-				else
+-					vTaskDelay(1000);
+-			}
+-
+-			rtw_free_sema(&tcp_tx_rx_sema);
+-		}
++	while(1) {
++		if(client_fd >= 0 && tx_exit && rx_exit) {
++			close(client_fd);
++			client_fd = -1;
++			rtw_free_sema(&tcp_tx_rx_sema);
++		}
++		fd_set readable;
++		FD_ZERO(&readable);
++		FD_SET(server_fd, &readable);
++		struct timeval timeout = { .tv_sec = 0, .tv_usec = 200000 };
++		if(select(server_fd + 1, &readable, NULL, NULL, &timeout) <= 0)
++			continue;
++		client_addr_size = sizeof(client_addr);
++		int incoming_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_size);
++
++		if(incoming_fd >= 0) {
++			if(client_fd >= 0) {
++				close(incoming_fd);
++				continue;
++			}
++			client_fd = incoming_fd;
++			rtw_init_sema(&tcp_tx_rx_sema, 1);
++			tx_exit = 0;
++			rx_exit = 0;
++
++			if(xTaskCreate(tx_thread, ((const char*)"tx_thread"), 512, &client_fd, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
++				tx_exit = 1;
++
++			if(xTaskCreate(rx_thread, ((const char*)"rx_thread"), 512, &client_fd, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
++				rx_exit = 1;
++		}
+ 	}
+ 
+ exit:
+@@ -252,7 +260,6 @@ void example_socket_tcp_trx_1(void)
+     serial_format(&sobj, 8, ParityNone, 1);
+ 	serial_rx_fifo_level(&sobj, FifoLvHalf);
+ 	serial_set_flow_control(&sobj, FlowControlRTSCTS, UART_RTS, UART_CTS);    // Pin assignment is ignored
+-	if(xTaskCreate(example_socket_tcp_trx_thread, ((const char*)"example_socket_tcp_trx_thread"), 1024, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
+-		printf("\n\r%s xTaskCreate(example_socket_tcp_trx_thread) failed", __FUNCTION__);
+-	rtw_free_sema(&tcp_tx_rx_sema);
+-}
+\ No newline at end of file
++	if(xTaskCreate(example_socket_tcp_trx_thread, ((const char*)"example_socket_tcp_trx_thread"), 1024, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
++		printf("\n\r%s xTaskCreate(example_socket_tcp_trx_thread) failed", __FUNCTION__);
++}
+
+diff --git a/project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/make/utilities_example/Makefile b/project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/make/utilities_example/Makefile
+--- a/project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/make/utilities_example/Makefile
++++ b/project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/make/utilities_example/Makefile
+@@ -92,3 +92,4 @@
+ CSRC += $(DIR)/httpd/example_httpc.c
+ CSRC += $(DIR)/ota_http/example_ota_http.c
++CSRC += $(DIR)/ota_http/gw018_portal.c
+ #CSRC += $(DIR)/ota_https/example_ota_https.c

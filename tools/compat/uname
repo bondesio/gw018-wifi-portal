@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# The SDK selects an unavailable x86_64 toolchain archive based on `uname -p`.
+# Report `unknown` for that one query so its Makefiles select the pinned i686 build.
+if [[ "$#" -eq 1 && "$1" == "-p" ]]; then
+  printf 'unknown\n'
+else
+  exec /usr/bin/uname "$@"
+fi
