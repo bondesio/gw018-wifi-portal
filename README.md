@@ -1,12 +1,29 @@
 # GW018-DM Wi-Fi provisioning firmware add-on
 
-This bundle applies the button-operated Wi-Fi setup portal to the WBRG1
-(RTL8721CSM) side of the Tuya GW018-DM and builds the firmware. It does not
-include the vendor SDK or a prebuilt firmware image. The SDK is obtained from
-the [Jasper GW018-DM SDK fork](https://github.com/jasperw1996/ambd_sdk_GW018-DM)
-at the pinned commit in `tools/prepare-sdk.sh`; that fork is based on the
+This project makes a compatible Tuya GW018-DM usable as a local Zigbee
+coordinator/adapter for Home Assistant with Zigbee2MQTT, without relying on the
+Tuya cloud. The gateway still needs a local Wi-Fi network and a Home Assistant
+host running Zigbee2MQTT.
+
+This bundle adds a button-operated Wi-Fi setup portal to the gateway's WBRG1
+(RTL8721CSM) network processor, so Wi-Fi credentials can be configured without
+reflashing. The separate ZS3L is the Zigbee processor; this bundle does not
+replace its firmware. This is buildable source, not a prebuilt image or a
+standalone firmware package. The vendor SDK is obtained from the
+[Jasper GW018-DM SDK fork](https://github.com/jasperw1996/ambd_sdk_GW018-DM) at
+the pinned commit in `tools/prepare-sdk.sh`; that fork is based on the
 [Seeed AmebaD SDK](https://github.com/Seeed-Studio/seeed-ambd-sdk). Read the
 upstream notices and terms before using or redistributing SDK-derived builds.
+
+## Device and purchase listing
+
+[![Tuya multi-mode Zigbee gateway product photo from the AliExpress listing](https://ae-pic-a1.aliexpress-media.com/kf/S5ae02f075736466ba4690944dc55bb6a7.jpg)](https://es.aliexpress.com/item/1005012218375007.html)
+
+Product photo and [AliExpress listing](https://es.aliexpress.com/item/1005012218375007.html)
+supplied by the project maintainer. The listing describes a generic multi-mode
+gateway and may offer variants; confirm with the seller that the selected item
+is the GW018-DM hardware (WBRG1/RTL8721CSM plus ZS3L) before ordering. Price,
+stock, and shipping details may change.
 
 ## Build host and requirements
 
@@ -51,8 +68,8 @@ OTA package. `build.sh` prints each output's SHA-256. Expected outputs are:
 - `project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/image/km0_km4_image2.bin`
 - `project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/image/OTA_All.bin`
 
-The OTA image is for the WBRG1 firmware. Do not use this procedure to update
-the separate Zigbee (ZS3L) processor.
+The OTA image is for the WBRG1 network processor only. It does not contain a
+ZS3L Zigbee firmware image; do not use this procedure to update the ZS3L.
 
 ## Flashing
 
