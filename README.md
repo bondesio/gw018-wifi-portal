@@ -11,9 +11,20 @@ reflashing. The separate ZS3L is the Zigbee processor; this bundle does not
 replace its firmware. This is buildable source, not a prebuilt image or a
 standalone firmware package. The vendor SDK is obtained from the
 [Jasper GW018-DM SDK fork](https://github.com/jasperw1996/ambd_sdk_GW018-DM) at
-the pinned commit in `tools/prepare-sdk.sh`; that fork is based on the
-[Seeed AmebaD SDK](https://github.com/Seeed-Studio/seeed-ambd-sdk). Read the
-upstream notices and terms before using or redistributing SDK-derived builds.
+the pinned commit in `tools/prepare-sdk.sh`.
+
+## Upstream credit and project relationship
+
+This project builds on the GW018-DM SDK adaptation by
+[@jasperw1996](https://github.com/jasperw1996/ambd_sdk_GW018-DM), which adapts
+[parasite85’s `rtl_firmware`](https://github.com/parasite85/rtl_firmware)
+for the GW018-DM’s WBRG1/RTL8721CSM, and the
+[Seeed Studio AmebaD SDK](https://github.com/Seeed-Studio/seeed-ambd-sdk).
+The button-operated Wi-Fi portal and the build/release overlay here are our
+changes on top of that work. These links credit the upstream maintainers; they
+do not imply that they reviewed, endorsed, or are affiliated with this project.
+Please also see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for scope
+and licensing notes.
 
 ## Device and purchase listing
 
@@ -72,6 +83,11 @@ The OTA image is for the WBRG1 network processor only. It does not contain a
 ZS3L Zigbee firmware image; do not use this procedure to update the ZS3L.
 
 ## Flashing
+
+The gateway can be flashed with a Raspberry Pi acting as the Linux host. The
+full procedure, including the Pi-specific uploader/serial-port caveat, is in
+[`docs/flashing-from-a-raspberry-pi.md`](docs/flashing-from-a-raspberry-pi.md).
+The shorter host-neutral procedure follows.
 
 For first installation or recovery, use a 3.3 V USB-to-TTL UART adapter and
 the Realtek/AmebaD ImageTool for Linux. The ImageTool is not bundled; obtain
