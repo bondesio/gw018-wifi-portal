@@ -11,8 +11,9 @@ GW018-DM WBRG1/RTL8721CSM; that project is itself forked from
 of Seeed Studio's AmebaD SDK:
 <https://github.com/Seeed-Studio/seeed-ambd-sdk>.
 
-This repository adds the button-operated Wi-Fi portal and build/release
-overlay on top of that lineage. These credits do not imply endorsement or
+This repository adds the button-operated Wi-Fi portal, selected application
+diagnostics, Home Assistant OS collector, and build/release overlay on top of
+that lineage. These credits do not imply endorsement or
 affiliation. Consult each upstream repository for its own license and notices.
 
 The SDK contains third-party Realtek/AmebaD code and binary materials with

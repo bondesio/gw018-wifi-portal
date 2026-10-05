@@ -1,0 +1,59 @@
+#ifndef HOST_LWIPOPTS_H
+#define HOST_LWIPOPTS_H
+/* Target execution/synchronization and TCP limits. Host alignment differs. */
+#define NO_SYS 0
+#define SYS_LIGHTWEIGHT_PROT 1
+#define LWIP_TCPIP_CORE_LOCKING 0
+#define LWIP_NETCONN_SEM_PER_THREAD 0
+#define LWIP_MPU_COMPATIBLE 0
+#define LWIP_NETCONN 1
+#define LWIP_SOCKET 1
+#define LWIP_COMPAT_SOCKETS 0
+#define LWIP_POSIX_SOCKETS_IO_NAMES 0
+#define LWIP_ERRNO_INCLUDE "errno.h"
+#define LWIP_TIMEVAL_PRIVATE 0
+#define MEM_ALIGNMENT 8
+#define MEM_SIZE (7*1024)
+#define MEMP_NUM_PBUF 100
+#define MEMP_NUM_UDP_PCB 6
+#define MEMP_NUM_TCP_PCB 10
+#define MEMP_NUM_TCP_PCB_LISTEN 5
+#define MEMP_NUM_TCP_SEG 20
+#define MEMP_NUM_SYS_TIMEOUT 13
+#define MEMP_NUM_NETCONN 8
+#define PBUF_POOL_SIZE 20
+#define PBUF_POOL_BUFSIZE 508
+#define TCP_MSS 1460
+#define TCP_SND_BUF (5*TCP_MSS)
+#define TCP_SND_QUEUELEN (4*TCP_SND_BUF/TCP_MSS)
+#define TCP_WND (5*TCP_MSS)
+#define LWIP_TCP_KEEPALIVE 1
+#define LWIP_SO_SNDTIMEO 1
+#define LWIP_SO_RCVTIMEO 1
+#define LWIP_SO_SNDRCVTIMEO_NONSTANDARD 1
+#define SO_REUSE 1
+#define LWIP_IPV6 0
+#define LWIP_DHCP 0
+#define LWIP_AUTOIP 0
+#define LWIP_DNS 0
+#define LWIP_IGMP 0
+#define LWIP_ARP 0
+#define LWIP_ETHERNET 0
+#define LWIP_RAW 1
+#define LWIP_NETIF_LOOPBACK 1
+#define LWIP_HAVE_LOOPIF 1
+#define TCPIP_THREAD_STACKSIZE 0
+#define TCPIP_MBOX_SIZE 6
+#define DEFAULT_UDP_RECVMBOX_SIZE 6
+#define DEFAULT_TCP_RECVMBOX_SIZE 6
+#define DEFAULT_RAW_RECVMBOX_SIZE 6
+#define DEFAULT_ACCEPTMBOX_SIZE 6
+#define TCPIP_THREAD_PRIO 0
+/* Test-only accounting and pool guard checks. */
+#define LWIP_STATS 1
+#define MEM_STATS 1
+#define MEMP_STATS 1
+#define SYS_STATS 0
+#define MEMP_OVERFLOW_CHECK 2
+#define MEMP_SANITY_CHECK 1
+#endif

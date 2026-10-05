@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the reviewed GW018 portal integration to the pinned SDK checkout."""
+"""Apply the reviewed portal and diagnostics integration to the pinned SDK checkout."""
 import argparse
 import re
 import shutil
@@ -41,6 +41,11 @@ def main():
     src = ROOT / "component/common/example/ota_http"
     shutil.copy2(src / "gw018_portal.c", dest / "gw018_portal.c")
     shutil.copy2(src / "gw018_portal.h", dest / "gw018_portal.h")
+
+    diag_dest = sdk / "component/common/example/socket_tcp_trx"
+    diag_src = ROOT / "component/common/example/socket_tcp_trx"
+    shutil.copy2(diag_src / "gateway_diag.c", diag_dest / "gateway_diag.c")
+    shutil.copy2(diag_src / "gateway_diag.h", diag_dest / "gateway_diag.h")
 
     ota_example = dest / "example_ota_http.c"
     content = ota_example.read_text()

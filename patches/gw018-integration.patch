@@ -1,21 +1,90 @@
+diff --git a/component/common/api/network/src/wlan_network.c b/component/common/api/network/src/wlan_network.c
+index f17bf8a92fae9bfbb32820f17726910fefa1d962..3ba6c95e36e7515bf253857701c3910c85a298f2 100644
+--- a/component/common/api/network/src/wlan_network.c
++++ b/component/common/api/network/src/wlan_network.c
+@@ -29,6 +29,11 @@
+ #define CONFIG_INTERACTIVE_MODE     1
+ #endif
+ 
++#if defined(CONFIG_EXAMPLE_SOCKET_TCP_TRX) && (CONFIG_EXAMPLE_SOCKET_TCP_TRX == 1) && CONFIG_INIT_NET && CONFIG_LWIP_LAYER
++#include "lwip/tcpip.h"
++#include "../../../example/socket_tcp_trx/gateway_diag.h"
++#endif
++
+ #define STACKSIZE                   (512 + 768)
+ 
+ xSemaphoreHandle uart_rx_interrupt_sema = NULL;
+@@ -65,6 +70,13 @@ void init_thread(void *param)
+ 	start_interactive_mode();
+ #endif	
+ 
++#if defined(CONFIG_EXAMPLE_SOCKET_TCP_TRX) && (CONFIG_EXAMPLE_SOCKET_TCP_TRX == 1) && CONFIG_INIT_NET && CONFIG_LWIP_LAYER
++	/* Publish only from the live TCPIP task after stack/netif initialization.
++	 * If enqueue fails, diagnostics stays dormant and cannot touch sockets. */
++	if (tcpip_callback_with_block(gateway_diag_network_ready, NULL, 0) != ERR_OK)
++		gateway_diag_event(GW_DIAG_LOG_ERROR, 3);
++#endif
++
+ 	/* Kill init thread after all init tasks done */
+ 	vTaskDelete(NULL);
+ }
 diff --git a/component/common/example/ota_http/example_ota_http.c b/component/common/example/ota_http/example_ota_http.c
-index 88fe3c014d96ae4c112276f9114358e8e60e94e1..d2854b320367e9a6ab72333b6a86765d6eb18554 100644
+index 88fe3c014d96ae4c112276f9114358e8e60e94e1..72ae3af371a7d16fe6d125316b7d4cefe7e7c52c 100644
 --- a/component/common/example/ota_http/example_ota_http.c
 +++ b/component/common/example/ota_http/example_ota_http.c
-@@ -17,7 +17,8 @@
- #endif
- #include <wifi_constants.h>
- #include "wifi_conf.h"
+@@ -1,105 +1,94 @@
+-
+-#if defined(CONFIG_PLATFORM_8711B)
+-#include "rtl8710b_ota.h"
+-#include <FreeRTOS.h>
+-#include <task.h>
+-#elif defined(CONFIG_PLATFORM_8195A)
+-#include <ota_8195a.h>
+-#elif defined(CONFIG_PLATFORM_8195BHP)
+-#include <ota_8195b.h>
+-#elif defined(CONFIG_PLATFORM_8710C)
+-#include <ota_8710c.h>
+-#elif defined(CONFIG_PLATFORM_8721D)
+-#include <platform/platform_stdlib.h>
+-#include "rtl8721d_ota.h"
+-#include <FreeRTOS.h>
+-#include <task.h>
+-#endif
+-#include <wifi_constants.h>
+-#include "wifi_conf.h"
 -#include "gpio_api.h"
-+#include "gpio_api.h"
-+#include "gw018_portal.h"
- 
- #define LED_BLUE   _PB_22 	//Blue LED
- #define PUSH_BTN   _PB_23 	//Push button
-@@ -50,49 +51,37 @@ void http_update_ota_task(void *param){
- 	
- 	printf("\n\r\n\r\n\r\n\r<<<<<< OTA HTTP Example >>>>>>>\n\r\n\r\n\r\n\r");
- 
+-
+-#define LED_BLUE   _PB_22 	//Blue LED
+-#define PUSH_BTN   _PB_23 	//Push button
+-
+-gpio_t led_blue;
+-gpio_t push_btn;
+-
+-#define PORT	8080
+-#define HOST	"192.168.0.119"  //"m-apps.oss-cn-shenzhen.aliyuncs.com"
+-#define RESOURCE "OTA_All.bin"     //"051103061600.bin"
+-
+-
+-#ifdef HTTP_OTA_UPDATE
+-void http_update_ota_task(void *param){
+-	(void)param;
+-
+-	// Init blue LED
+-	gpio_init(&led_blue, LED_BLUE);
+-	gpio_dir(&led_blue, PIN_OUTPUT);    // Direction: Output
+-	gpio_mode(&led_blue, PullNone);     // No pull
+-
+-	// Initial Push Button pin
+-    gpio_init(&push_btn, PUSH_BTN);
+-    gpio_dir(&push_btn, PIN_INPUT);     // Direction: Input
+-    gpio_mode(&push_btn, PullNone);       // No pull
+-	
+-#if defined(configENABLE_TRUSTZONE) && (configENABLE_TRUSTZONE == 1)
+-	rtw_create_secure_context(configMINIMAL_SECURE_STACK_SIZE);
+-#endif
+-	
+-	printf("\n\r\n\r\n\r\n\r<<<<<< OTA HTTP Example >>>>>>>\n\r\n\r\n\r\n\r");
+-
 -	vTaskDelay(5000);
 -
 -	int counter = 0;
@@ -59,6 +128,69 @@ index 88fe3c014d96ae4c112276f9114358e8e60e94e1..d2854b320367e9a6ab72333b6a86765d
 -		ota_platform_reset();
 -	}
 -	vTaskDelete(NULL);	
+-}
+-
+-
+-void example_ota_http(void){
+-		if(xTaskCreate(http_update_ota_task, (char const *)"http_update_ota_task", 1024, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS){
+-		printf("\n\r[%s] Create update task failed", __FUNCTION__);
+-	}
+-}
+-#endif
+-
++
++#if defined(CONFIG_PLATFORM_8711B)
++#include "rtl8710b_ota.h"
++#include <FreeRTOS.h>
++#include <task.h>
++#elif defined(CONFIG_PLATFORM_8195A)
++#include <ota_8195a.h>
++#elif defined(CONFIG_PLATFORM_8195BHP)
++#include <ota_8195b.h>
++#elif defined(CONFIG_PLATFORM_8710C)
++#include <ota_8710c.h>
++#elif defined(CONFIG_PLATFORM_8721D)
++#include <platform/platform_stdlib.h>
++#include "rtl8721d_ota.h"
++#include <FreeRTOS.h>
++#include <task.h>
++#endif
++#include <wifi_constants.h>
++#include "wifi_conf.h"
++#include "gpio_api.h"
++#include "gw018_portal.h"
++
++#define LED_BLUE   _PB_22 	//Blue LED
++#define PUSH_BTN   _PB_23 	//Push button
++
++gpio_t led_blue;
++gpio_t push_btn;
++
++#define PORT	8080
++#define HOST	"ota.example.invalid" /* Configured by apply-overlay.py. */
++#define RESOURCE "OTA_All.bin"     //"051103061600.bin"
++
++
++#ifdef HTTP_OTA_UPDATE
++void http_update_ota_task(void *param){
++	(void)param;
++
++	// Init blue LED
++	gpio_init(&led_blue, LED_BLUE);
++	gpio_dir(&led_blue, PIN_OUTPUT);    // Direction: Output
++	gpio_mode(&led_blue, PullNone);     // No pull
++
++	// Initial Push Button pin
++    gpio_init(&push_btn, PUSH_BTN);
++    gpio_dir(&push_btn, PIN_INPUT);     // Direction: Input
++    gpio_mode(&push_btn, PullNone);       // No pull
++	
++#if defined(configENABLE_TRUSTZONE) && (configENABLE_TRUSTZONE == 1)
++	rtw_create_secure_context(configMINIMAL_SECURE_STACK_SIZE);
++#endif
++	
++	printf("\n\r\n\r\n\r\n\r<<<<<< OTA HTTP Example >>>>>>>\n\r\n\r\n\r\n\r");
++
 +	vTaskDelay(pdMS_TO_TICKS(5000));
 +	int down = 0;
 +	int long_press_done = 0;
@@ -90,70 +222,225 @@ index 88fe3c014d96ae4c112276f9114358e8e60e94e1..d2854b320367e9a6ab72333b6a86765d
 +		gw018_portal_tick();
 +		vTaskDelay(pdMS_TO_TICKS(50));
 +	}
- }
- 
- 
++}
++
++
++void example_ota_http(void){
++		if(xTaskCreate(http_update_ota_task, (char const *)"http_update_ota_task", 1024, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS){
++		printf("\n\r[%s] Create update task failed", __FUNCTION__);
++	}
++}
++#endif
++
 diff --git a/component/common/example/socket_tcp_trx/example_socket_tcp_trx_1.c b/component/common/example/socket_tcp_trx/example_socket_tcp_trx_1.c
-index 15845fb160402a645b99664039484087042b854e..43cbd15871deca5f26b7046c3be08f2eddfb7167 100644
+index 15845fb160402a645b99664039484087042b854e..282d05e650fecd7ad3a704fa4b17ac0fc892268c 100644
 --- a/component/common/example/socket_tcp_trx/example_socket_tcp_trx_1.c
 +++ b/component/common/example/socket_tcp_trx/example_socket_tcp_trx_1.c
-@@ -1,13 +1,17 @@
- #include "FreeRTOS.h"
- #include "task.h"
- #include <platform/platform_stdlib.h>
+@@ -1,258 +1,358 @@
+-#include "FreeRTOS.h"
+-#include "task.h"
+-#include <platform/platform_stdlib.h>
 -#include <lwip/sockets.h>
-+#include <lwip/sockets.h>
-+#include <lwip_netconf.h>
-+#include <wifi_conf.h>
- //#include <osdep_api.h>
- #include <osdep_service.h>
- #include "serial_api.h"
- #include "serial_ex_api.h"
- 
+-//#include <osdep_api.h>
+-#include <osdep_service.h>
+-#include "serial_api.h"
+-#include "serial_ex_api.h"
+-
 -#include "gpio_api.h"   // mbed
-+#include "gpio_api.h"   // mbed
-+
-+extern struct netif xnetif[NET_IF_NUM];
- 
- #define SERVER_PORT     80
- #define LISTEN_QLEN     2
-@@ -162,9 +166,9 @@ exit:
- 
- static void example_socket_tcp_trx_thread(void *param)
- {
+-
+-#define SERVER_PORT     80
+-#define LISTEN_QLEN     2
+-
+-#define UART_TX    	_PA_18	//UART0  TX
+-#define UART_RX    	_PA_19	//UART0  RX
+-#define UART_RTS  	_PA_16	//UART0  RTS
+-#define UART_CTS   	_PA_17	//UART0  CTS
+-#define LED_BLUE    _PB_22 	//Blue LED
+-
+-gpio_t led_blue;
+-
+-static int tx_exit = 0, rx_exit = 0;
+-//static _Sema tcp_tx_rx_sema;
+-static _sema tcp_tx_rx_sema;
+-
+-// i`m not sure if this is needed
+-// maybe UART can work in separate tasks
+-// maybe later i`ll check
+-static _sema uart_tx_rx_sema;
+-
+-//#define Z_UART_DEBUG
+-serial_t sobj;
+-
+-
+-void uart_send_data(serial_t *sobj, void *data, int count)
+-{
+-    unsigned int i=0;
+-    rtw_down_sema(&uart_tx_rx_sema);
+-    for (i=0;i<count;i++) {
+-        serial_putc(sobj, ((char *)data)[i]);
+-    }
+-    rtw_up_sema(&uart_tx_rx_sema);
+-}
+-
+-
+-static void tx_thread(void *param)
+-{
+-	int client_fd = * (int *) param;
+-	unsigned char buffer[1024];
+-	memset(buffer, 0, sizeof(buffer));
+-	gpio_write(&led_blue, 1); // turn on blue LED
+-	printf("\n%s start\n", __FUNCTION__);
+-
+-	while(1) {
+-		int ret = 0;
+-
+-
+-        // simple buffering
+-        // to avoid sending frame with few bytes
+-        // if there is more in the pipe
+-        int i = 0;
+-        int j = 0;
+-        for (i=0;i<sizeof(buffer);i++){
+-            if (serial_readable(&sobj))
+-            {
+-                rtw_down_sema(&uart_tx_rx_sema);
+-                buffer[j++] = serial_getc(&sobj);
+-                rtw_up_sema(&uart_tx_rx_sema);
+-            }
+-        }
+-
+-        if (j>0)
+-        {
+-#ifdef Z_UART_DEBUG
+-            printf("%d bytes UART->TCP: ", j);
+-            int i = 0;
+-            for (i = 0; i < j ; i++)
+-            {
+-                printf("0x%x ",buffer[i]);
+-            }
+-            printf("\n");
+-#endif
+-            if (j<sizeof(buffer)){
+-                rtw_down_sema(&tcp_tx_rx_sema);
+-                ret = send(client_fd, buffer, j, 0);
+-                rtw_up_sema(&tcp_tx_rx_sema);
+-            }
+-            else
+-            {
+-                printf("buff corrupted");
+-            }
+-        }
+-        else
+-        {
+-            if (rx_exit){
+-                goto exit;
+-            }
+-            continue; // avoid quit
+-        }
+-
+-		if(ret <= 0)
+-			goto exit;
+-
+-		// vTaskDelay(100);
+-	}
+-
+-exit:
+-	gpio_write(&led_blue, 0); // turn off blue LED
+-	printf("\n%s exit\n", __FUNCTION__);
+-	tx_exit = 1;
+-	vTaskDelete(NULL);
+-}
+-
+-static void rx_thread(void *param)
+-{
+-	int client_fd = * (int *) param;
+-	unsigned char buffer[1024];
+-	gpio_write(&led_blue, 1); // turn on blue LED
+-	printf("\n%s start\n", __FUNCTION__);
+-
+-	while(1) {
+-		int ret = 0, sock_err = 0;
+-		size_t err_len = sizeof(sock_err);
+-
+-		rtw_down_sema(&tcp_tx_rx_sema);
+-		ret = recv(client_fd, buffer, sizeof(buffer), MSG_DONTWAIT);
+-		getsockopt(client_fd, SOL_SOCKET, SO_ERROR, &sock_err, &err_len);
+-		rtw_up_sema(&tcp_tx_rx_sema);
+-        if (ret > 0){
+-#ifdef Z_UART_DEBUG
+-            printf("%d bytes TCP->UART: ", ret);
+-            int i=0;
+-            for (i=0;i<ret;i++)
+-            {
+-                printf("0x%x ",buffer[i]);
+-            }
+-            printf("\n");
+-#endif
+-            uart_send_data( &sobj, buffer, ret);
+-        }
+-
+-		// ret == -1 and socket error == EAGAIN when no data received for nonblocking
+-		if((ret == -1) && ((sock_err == EAGAIN)
+-#if LWIP_VERSION_MAJOR >= 2
+-			||(sock_err == 0)
+-#endif
+-		))
+-			continue;
+-		else if(ret <= 0)
+-			goto exit;
+-
+-		vTaskDelay(10);
+-	}
+-
+-exit:
+-	gpio_write(&led_blue, 0); // turn off blue LED
+-	printf("\n%s exit\n", __FUNCTION__);
+-	rx_exit = 1;
+-	vTaskDelete(NULL);
+-}
+-
+-static void example_socket_tcp_trx_thread(void *param)
+-{
 -	int server_fd = -1, client_fd = -1;
 -	struct sockaddr_in server_addr, client_addr;
 -	size_t client_addr_size;
-+	int server_fd = -1, client_fd = -1;
-+	struct sockaddr_in server_addr, client_addr;
-+	socklen_t client_addr_size;
- 
- 	// Delay to wait for IP by DHCP
- 	int counter = 0;
-@@ -187,10 +191,15 @@ static void example_socket_tcp_trx_thread(void *param)
- 	printf("\nExample: socket tx/rx 1\n");
- 	// gpio_write(&led_blue, 1); // uncomment to turn on blue LED permanently
- 
+-
+-	// Delay to wait for IP by DHCP
+-	int counter = 0;
+-
+-	// Init blue LED
+-	gpio_init(&led_blue, LED_BLUE);
+-	gpio_dir(&led_blue, PIN_OUTPUT);    // Direction: Output
+-	gpio_mode(&led_blue, PullNone);     // No pull
+-
+-	while (counter < 10) {
+-		if (counter % 2 == 0) {
+-			gpio_write(&led_blue, 1); // turn on blue LED
+-		} else {
+-			gpio_write(&led_blue, 0); // turn off blue LED
+-		}
+-		counter++;
+-		vTaskDelay(500);
+-	}
+-
+-	printf("\nExample: socket tx/rx 1\n");
+-	// gpio_write(&led_blue, 1); // uncomment to turn on blue LED permanently
+-
 -	server_fd = socket(AF_INET, SOCK_STREAM, 0);
 -	server_addr.sin_family = AF_INET;
 -	server_addr.sin_port = htons(SERVER_PORT);
 -	server_addr.sin_addr.s_addr = INADDR_ANY;
-+	/* Bind the Zigbee UART bridge only to the station IP. The setup AP has
-+	 * its own independent HTTP listener on 192.168.43.1:80. */
-+	while (wifi_is_ready_to_transceive(RTW_STA_INTERFACE) != RTW_SUCCESS ||
-+	       ip_addr_get_ip4_u32(netif_ip_addr4(&xnetif[0])) == 0)
-+		vTaskDelay(pdMS_TO_TICKS(100));
-+	server_fd = socket(AF_INET, SOCK_STREAM, 0);
-+	server_addr.sin_family = AF_INET;
-+	server_addr.sin_port = htons(SERVER_PORT);
-+	server_addr.sin_addr.s_addr = ip_addr_get_ip4_u32(netif_ip_addr4(&xnetif[0]));
- 
- 	if(bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
- 		printf("ERROR: bind\n");
-@@ -202,38 +211,37 @@ static void example_socket_tcp_trx_thread(void *param)
- 		goto exit;
- 	}
- 
+-
+-	if(bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
+-		printf("ERROR: bind\n");
+-		goto exit;
+-	}
+-
+-	if(listen(server_fd, LISTEN_QLEN) != 0) {
+-		printf("ERROR: listen\n");
+-		goto exit;
+-	}
+-
 -	while(1) {
 -		client_addr_size = sizeof(client_addr);
 -		client_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_size);
@@ -186,58 +473,554 @@ index 15845fb160402a645b99664039484087042b854e..43cbd15871deca5f26b7046c3be08f2e
 -
 -			rtw_free_sema(&tcp_tx_rx_sema);
 -		}
-+	while(1) {
-+		if(client_fd >= 0 && tx_exit && rx_exit) {
-+			close(client_fd);
-+			client_fd = -1;
-+			rtw_free_sema(&tcp_tx_rx_sema);
-+		}
-+		fd_set readable;
-+		FD_ZERO(&readable);
-+		FD_SET(server_fd, &readable);
-+		struct timeval timeout = { .tv_sec = 0, .tv_usec = 200000 };
-+		if(select(server_fd + 1, &readable, NULL, NULL, &timeout) <= 0)
-+			continue;
-+		client_addr_size = sizeof(client_addr);
-+		int incoming_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_size);
-+
-+		if(incoming_fd >= 0) {
-+			if(client_fd >= 0) {
-+				close(incoming_fd);
-+				continue;
-+			}
-+			client_fd = incoming_fd;
-+			rtw_init_sema(&tcp_tx_rx_sema, 1);
-+			tx_exit = 0;
-+			rx_exit = 0;
-+
-+			if(xTaskCreate(tx_thread, ((const char*)"tx_thread"), 512, &client_fd, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
-+				tx_exit = 1;
-+
-+			if(xTaskCreate(rx_thread, ((const char*)"rx_thread"), 512, &client_fd, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
-+				rx_exit = 1;
-+		}
- 	}
- 
- exit:
-@@ -252,7 +260,6 @@ void example_socket_tcp_trx_1(void)
-     serial_format(&sobj, 8, ParityNone, 1);
- 	serial_rx_fifo_level(&sobj, FifoLvHalf);
- 	serial_set_flow_control(&sobj, FlowControlRTSCTS, UART_RTS, UART_CTS);    // Pin assignment is ignored
+-	}
+-
+-exit:
+-	close(server_fd);
+-	vTaskDelete(NULL);
+-}
+-
+-void example_socket_tcp_trx_1(void)
+-{
+-	sobj.uart_idx = 0;
+-
+-    // mbed uart test
+-    rtw_init_sema(&uart_tx_rx_sema, 1);
+-    serial_init(&sobj,UART_TX,UART_RX);
+-    serial_baud(&sobj,115200);
+-    serial_format(&sobj, 8, ParityNone, 1);
+-	serial_rx_fifo_level(&sobj, FifoLvHalf);
+-	serial_set_flow_control(&sobj, FlowControlRTSCTS, UART_RTS, UART_CTS);    // Pin assignment is ignored
 -	if(xTaskCreate(example_socket_tcp_trx_thread, ((const char*)"example_socket_tcp_trx_thread"), 1024, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
 -		printf("\n\r%s xTaskCreate(example_socket_tcp_trx_thread) failed", __FUNCTION__);
 -	rtw_free_sema(&tcp_tx_rx_sema);
--}
-\ No newline at end of file
-+	if(xTaskCreate(example_socket_tcp_trx_thread, ((const char*)"example_socket_tcp_trx_thread"), 1024, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS)
-+		printf("\n\r%s xTaskCreate(example_socket_tcp_trx_thread) failed", __FUNCTION__);
++#include "FreeRTOS.h"
++#include "task.h"
++#include <platform/platform_stdlib.h>
++#include <lwip/sockets.h>
++#include <lwip_netconf.h>
++#include <wifi_conf.h>
++//#include <osdep_api.h>
++#include <osdep_service.h>
++#include "serial_api.h"
++#include "serial_ex_api.h"
++
++#include "gpio_api.h"   // mbed
++#include "gateway_diag.h"
++
++extern struct netif xnetif[NET_IF_NUM];
++
++#define SERVER_PORT     80
++#define LISTEN_QLEN     2
++
++#define UART_TX    	_PA_18	//UART0  TX
++#define UART_RX    	_PA_19	//UART0  RX
++#define UART_RTS  	_PA_16	//UART0  RTS
++#define UART_CTS   	_PA_17	//UART0  CTS
++#define LED_BLUE    _PB_22 	//Blue LED
++
++gpio_t led_blue;
++
++static int tx_exit = 0, rx_exit = 0;
++//static _Sema tcp_tx_rx_sema;
++static _sema tcp_tx_rx_sema;
++
++// i`m not sure if this is needed
++// maybe UART can work in separate tasks
++// maybe later i`ll check
++static _sema uart_tx_rx_sema;
++
++//#define Z_UART_DEBUG
++serial_t sobj;
++
++
++void uart_send_data(serial_t *sobj, void *data, int count)
++{
++    unsigned int i=0;
++    gateway_diag_task_state(GW_DIAG_ROLE_RX, GW_DIAG_STATE_UART_SEM);
++    rtw_down_sema(&uart_tx_rx_sema);
++    /* serial_putc may wait indefinitely for writable/flow-control state.
++     * This marker describes the API wait; it does not sample the CTS pin. */
++    gateway_diag_task_state(GW_DIAG_ROLE_RX, GW_DIAG_STATE_UART_WRITE);
++    for (i=0;i<count;i++) {
++        serial_putc(sobj, ((char *)data)[i]);
++        gateway_diag_task_progress(GW_DIAG_ROLE_RX);
++    }
++    rtw_up_sema(&uart_tx_rx_sema);
++    gateway_diag_add(GW_DIAG_UART_TX_BYTES, (unsigned long)count);
++    gateway_diag_task_state(GW_DIAG_ROLE_RX, GW_DIAG_STATE_IDLE);
 +}
-
++
++
++static void tx_thread(void *param)
++{
++	int client_fd = * (int *) param;
++	unsigned long exit_reason = 0;
++	unsigned char buffer[1024];
++	gateway_diag_task_start(GW_DIAG_ROLE_TX);
++	memset(buffer, 0, sizeof(buffer));
++	gpio_write(&led_blue, 1); // turn on blue LED
++	printf("\n%s start\n", __FUNCTION__);
++
++	while(1) {
++		int ret = 0;
++        gateway_diag_task_heartbeat(GW_DIAG_ROLE_TX);
++        gateway_diag_task_state(GW_DIAG_ROLE_TX, GW_DIAG_STATE_IDLE);
++
++
++        // simple buffering
++        // to avoid sending frame with few bytes
++        // if there is more in the pipe
++        int i = 0;
++        int j = 0;
++        for (i=0;i<sizeof(buffer);i++){
++            if (serial_readable(&sobj))
++            {
++                gateway_diag_task_state(GW_DIAG_ROLE_TX, GW_DIAG_STATE_UART_SEM);
++                rtw_down_sema(&uart_tx_rx_sema);
++                gateway_diag_task_state(GW_DIAG_ROLE_TX, GW_DIAG_STATE_UART_READ);
++                buffer[j++] = serial_getc(&sobj);
++                gateway_diag_task_progress(GW_DIAG_ROLE_TX);
++                rtw_up_sema(&uart_tx_rx_sema);
++            }
++        }
++
++        gateway_diag_task_state(GW_DIAG_ROLE_TX, GW_DIAG_STATE_IDLE);
++        if (j>0)
++        {
++            gateway_diag_add(GW_DIAG_UART_RX_BYTES, (unsigned long)j);
++#ifdef Z_UART_DEBUG
++            printf("%d bytes UART->TCP: ", j);
++            int i = 0;
++            for (i = 0; i < j ; i++)
++            {
++                printf("0x%x ",buffer[i]);
++            }
++            printf("\n");
++#endif
++            if (j<sizeof(buffer)){
++                gateway_diag_task_state(GW_DIAG_ROLE_TX, GW_DIAG_STATE_TCP_SEM);
++                rtw_down_sema(&tcp_tx_rx_sema);
++                gateway_diag_task_state(GW_DIAG_ROLE_TX, GW_DIAG_STATE_TCP_SEND);
++                ret = send(client_fd, buffer, j, 0);
++                if (ret > 0)
++                    gateway_diag_task_progress(GW_DIAG_ROLE_TX);
++                rtw_up_sema(&tcp_tx_rx_sema);
++                gateway_diag_task_state(GW_DIAG_ROLE_TX, GW_DIAG_STATE_IDLE);
++                if (ret > 0) {
++                    gateway_diag_add(GW_DIAG_TCP_TX_BYTES, (unsigned long)ret);
++                    if (ret < j)
++                        gateway_diag_add(GW_DIAG_TCP_SHORT_SENDS, 1);
++                } else {
++                    gateway_diag_add(GW_DIAG_TCP_SEND_ERRORS, 1);
++                    exit_reason = 2;
++                }
++            }
++            else
++            {
++                gateway_diag_add(GW_DIAG_UART_BUFFER_DROPS, (unsigned long)j);
++                exit_reason = 3;
++                printf("buff corrupted");
++            }
++        }
++        else
++        {
++            if (rx_exit){
++                exit_reason = 1;
++                goto exit;
++            }
++            continue; // avoid quit
++        }
++
++		if(ret <= 0)
++			goto exit;
++
++		// vTaskDelay(100);
++	}
++
++exit:
++	gpio_write(&led_blue, 0); // turn off blue LED
++	printf("\n%s exit\n", __FUNCTION__);
++	gateway_diag_event(GW_DIAG_TX_EXIT, exit_reason);
++	gateway_diag_task_stop(GW_DIAG_ROLE_TX);
++	tx_exit = 1;
++	vTaskDelete(NULL);
++}
++
++static void rx_thread(void *param)
++{
++	int client_fd = * (int *) param;
++	unsigned long exit_reason = 0;
++	unsigned char buffer[1024];
++	gateway_diag_task_start(GW_DIAG_ROLE_RX);
++	gpio_write(&led_blue, 1); // turn on blue LED
++	printf("\n%s start\n", __FUNCTION__);
++
++	while(1) {
++		int ret = 0, sock_err = 0;
++		size_t err_len = sizeof(sock_err);
++
++        gateway_diag_task_heartbeat(GW_DIAG_ROLE_RX);
++        gateway_diag_task_state(GW_DIAG_ROLE_RX, GW_DIAG_STATE_IDLE);
++        gateway_diag_task_state(GW_DIAG_ROLE_RX, GW_DIAG_STATE_TCP_SEM);
++		rtw_down_sema(&tcp_tx_rx_sema);
++		gateway_diag_task_state(GW_DIAG_ROLE_RX, GW_DIAG_STATE_TCP_RECV);
++		ret = recv(client_fd, buffer, sizeof(buffer), MSG_DONTWAIT);
++        if (ret > 0)
++            gateway_diag_task_progress(GW_DIAG_ROLE_RX);
++        gateway_diag_task_state(GW_DIAG_ROLE_RX, GW_DIAG_STATE_TCPIP);
++		getsockopt(client_fd, SOL_SOCKET, SO_ERROR, &sock_err, &err_len);
++		rtw_up_sema(&tcp_tx_rx_sema);
++        gateway_diag_task_state(GW_DIAG_ROLE_RX, GW_DIAG_STATE_IDLE);
++        if (ret > 0){
++            gateway_diag_add(GW_DIAG_TCP_RX_BYTES, (unsigned long)ret);
++#ifdef Z_UART_DEBUG
++            printf("%d bytes TCP->UART: ", ret);
++            int i=0;
++            for (i=0;i<ret;i++)
++            {
++                printf("0x%x ",buffer[i]);
++            }
++            printf("\n");
++#endif
++            uart_send_data( &sobj, buffer, ret);
++        }
++
++		// ret == -1 and socket error == EAGAIN when no data received for nonblocking
++		if((ret == -1) && ((sock_err == EAGAIN)
++#if LWIP_VERSION_MAJOR >= 2
++			||(sock_err == 0)
++#endif
++		))
++			continue;
++		else if(ret <= 0) {
++			exit_reason = ret == 0 ? 1 : 2;
++			if (ret < 0)
++				gateway_diag_add(GW_DIAG_TCP_RECV_ERRORS, 1);
++			goto exit;
++		}
++
++		gateway_diag_task_state(GW_DIAG_ROLE_RX, GW_DIAG_STATE_DELAY);
++		vTaskDelay(10);
++	}
++
++exit:
++	gpio_write(&led_blue, 0); // turn off blue LED
++	printf("\n%s exit\n", __FUNCTION__);
++	gateway_diag_event(GW_DIAG_RX_EXIT, exit_reason);
++	gateway_diag_task_stop(GW_DIAG_ROLE_RX);
++	rx_exit = 1;
++	vTaskDelete(NULL);
++}
++
++static void example_socket_tcp_trx_thread(void *param)
++{
++	int server_fd = -1, client_fd = -1;
++	struct sockaddr_in server_addr, client_addr;
++	socklen_t client_addr_size;
++
++	gateway_diag_task_start(GW_DIAG_ROLE_BRIDGE);
++	gateway_diag_event(GW_DIAG_BRIDGE_START, SERVER_PORT);
++
++	// Delay to wait for IP by DHCP
++	int counter = 0;
++
++	// Init blue LED
++	gpio_init(&led_blue, LED_BLUE);
++	gpio_dir(&led_blue, PIN_OUTPUT);    // Direction: Output
++	gpio_mode(&led_blue, PullNone);     // No pull
++
++	while (counter < 10) {
++        gateway_diag_task_heartbeat(GW_DIAG_ROLE_BRIDGE);
++        gateway_diag_task_state(GW_DIAG_ROLE_BRIDGE, GW_DIAG_STATE_IDLE);
++		if (counter % 2 == 0) {
++			gpio_write(&led_blue, 1); // turn on blue LED
++		} else {
++			gpio_write(&led_blue, 0); // turn off blue LED
++		}
++		counter++;
++		gateway_diag_task_state(GW_DIAG_ROLE_BRIDGE, GW_DIAG_STATE_DELAY);
++		vTaskDelay(500);
++	}
++
++	printf("\nExample: socket tx/rx 1\n");
++	// gpio_write(&led_blue, 1); // uncomment to turn on blue LED permanently
++
++	gateway_diag_task_state(GW_DIAG_ROLE_BRIDGE, GW_DIAG_STATE_NETWORK_WAIT);
++	while (wifi_is_ready_to_transceive(RTW_STA_INTERFACE) != RTW_SUCCESS ||
++	       ip_addr_get_ip4_u32(netif_ip_addr4(&xnetif[0])) == 0) {
++		gateway_diag_task_heartbeat(GW_DIAG_ROLE_BRIDGE);
++		vTaskDelay(pdMS_TO_TICKS(100));
++	}
++	gateway_diag_task_state(GW_DIAG_ROLE_BRIDGE, GW_DIAG_STATE_TCPIP);
++	server_fd = socket(AF_INET, SOCK_STREAM, 0);
++	if (server_fd < 0) {
++		gateway_diag_event(GW_DIAG_BRIDGE_ERROR, 1);
++		goto exit;
++	}
++	server_addr.sin_family = AF_INET;
++	server_addr.sin_port = htons(SERVER_PORT);
++	/* Keep the Zigbee bridge on the station LAN; the setup AP owns its
++	 * separate HTTP listener on the AP interface. */
++	server_addr.sin_addr.s_addr = ip_addr_get_ip4_u32(netif_ip_addr4(&xnetif[0]));
++
++	if(bind(server_fd, (struct sockaddr *) &server_addr, sizeof(server_addr)) != 0) {
++		gateway_diag_event(GW_DIAG_BRIDGE_ERROR, 2);
++		printf("ERROR: bind\n");
++		goto exit;
++	}
++
++	if(listen(server_fd, LISTEN_QLEN) != 0) {
++		gateway_diag_event(GW_DIAG_BRIDGE_ERROR, 3);
++		printf("ERROR: listen\n");
++		goto exit;
++	}
++
++	gateway_diag_event(GW_DIAG_BRIDGE_LISTEN, SERVER_PORT);
++	while(1) {
++		fd_set readable;
++		struct timeval timeout = { .tv_sec = 0, .tv_usec = 200000 };
++		int selected;
++
++		gateway_diag_task_heartbeat(GW_DIAG_ROLE_BRIDGE);
++		if (client_fd >= 0 && tx_exit && rx_exit) {
++			gateway_diag_task_state(GW_DIAG_ROLE_BRIDGE, GW_DIAG_STATE_TCPIP);
++			close(client_fd);
++			client_fd = -1;
++			rtw_free_sema(&tcp_tx_rx_sema);
++			gateway_diag_add(GW_DIAG_BRIDGE_DISCONNECTS, 1);
++			gateway_diag_event(GW_DIAG_BRIDGE_DISCONNECT, 0);
++		}
++		FD_ZERO(&readable);
++		FD_SET(server_fd, &readable);
++		gateway_diag_task_state(GW_DIAG_ROLE_BRIDGE,
++		                        client_fd >= 0 ? GW_DIAG_STATE_WAIT_TASKS : GW_DIAG_STATE_ACCEPT);
++		selected = select(server_fd + 1, &readable, NULL, NULL, &timeout);
++		if (selected <= 0)
++			continue;
++
++		client_addr_size = sizeof(client_addr);
++		int incoming_fd = accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_size);
++		if (incoming_fd < 0)
++			continue;
++		if (client_fd >= 0) {
++			close(incoming_fd);
++			continue;
++		}
++
++		client_fd = incoming_fd;
++		gateway_diag_add(GW_DIAG_BRIDGE_CONNECTIONS, 1);
++		gateway_diag_event(GW_DIAG_BRIDGE_CONNECT, 0);
++		rtw_init_sema(&tcp_tx_rx_sema, 1);
++		tx_exit = 0;
++		rx_exit = 0;
++
++		if(xTaskCreate(tx_thread, ((const char*)"tx_thread"), 512, &client_fd,
++		               tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
++			gateway_diag_event(GW_DIAG_TASK_ERROR, 1);
++			tx_exit = 1;
++		}
++		if(xTaskCreate(rx_thread, ((const char*)"rx_thread"), 512, &client_fd,
++		               tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
++			gateway_diag_event(GW_DIAG_TASK_ERROR, 2);
++			rx_exit = 1;
++		}
++	}
++
++exit:
++	gateway_diag_task_state(GW_DIAG_ROLE_BRIDGE, GW_DIAG_STATE_TCPIP);
++	close(server_fd);
++	gateway_diag_task_stop(GW_DIAG_ROLE_BRIDGE);
++	vTaskDelete(NULL);
++}
++
++void example_socket_tcp_trx_1(void)
++{
++	gateway_diag_start();
++	sobj.uart_idx = 0;
++
++    // mbed uart test
++    rtw_init_sema(&uart_tx_rx_sema, 1);
++    serial_init(&sobj,UART_TX,UART_RX);
++    serial_baud(&sobj,115200);
++    serial_format(&sobj, 8, ParityNone, 1);
++	serial_rx_fifo_level(&sobj, FifoLvHalf);
++	serial_set_flow_control(&sobj, FlowControlRTSCTS, UART_RTS, UART_CTS);    // Pin assignment is ignored
++	gateway_diag_boot_event(GW_DIAG_UART_READY, 115200);
++	if(xTaskCreate(example_socket_tcp_trx_thread, ((const char*)"example_socket_tcp_trx_thread"), 1024, NULL, tskIDLE_PRIORITY + 1, NULL) != pdPASS) {
++		gateway_diag_boot_event(GW_DIAG_TASK_ERROR, 3);
++		printf("\n\r%s xTaskCreate(example_socket_tcp_trx_thread) failed", __FUNCTION__);
++	}
+ }
+\ No newline at end of file
+diff --git a/component/common/network/lwip/lwip_v2.0.2/src/api/sockets.c b/component/common/network/lwip/lwip_v2.0.2/src/api/sockets.c
+index 4828bf2385b6f75a9412fa1d9121e1eafe3dc004..d392957463392f2bf4d6d2adad26e8758cbecc21 100644
+--- a/component/common/network/lwip/lwip_v2.0.2/src/api/sockets.c
++++ b/component/common/network/lwip/lwip_v2.0.2/src/api/sockets.c
+@@ -640,6 +640,82 @@ lwip_close(int s)
+   return 0;
+ }
+ 
++#if LWIP_TCP
++/* Gateway diagnostic clients have one task owner. No listener, ISR or TCPIP
++ * thread callers: synchronization follows the socket-option API. No ABI change. */
++struct lwip_diag_socket_data {
++  struct netconn *conn;
++  sys_sem_t *completed_sem;
++  err_t err;
++  int abort_connection;
++  int can_send;
++};
++
++static void
++lwip_diag_socket_callback(void *arg)
++{
++  struct lwip_diag_socket_data *data = (struct lwip_diag_socket_data *)arg;
++  struct tcp_pcb *pcb = data->conn->pcb.tcp;
++  if (data->conn->state != NETCONN_NONE) {
++    data->err = ERR_INPROGRESS;
++  } else if (pcb != NULL && pcb->state == LISTEN) {
++    data->err = ERR_VAL;
++  } else if (data->abort_connection) {
++    if (pcb != NULL) {
++      /* err_tcp may clear this too. Detach before freeing even in TIME_WAIT. */
++      data->conn->pcb.tcp = NULL;
++      tcp_abort(pcb);
++    }
++    data->err = ERR_OK;
++  } else if (pcb == NULL) {
++    data->err = ERR_CLSD;
++  } else {
++    data->can_send = pcb->unsent == NULL && pcb->unacked == NULL;
++    data->err = ERR_OK;
++  }
++#if !LWIP_TCPIP_CORE_LOCKING
++  sys_sem_signal(data->completed_sem);
++#endif
++}
++
++static int
++lwip_diag_socket_operation(int s, int abort_connection)
++{
++  struct lwip_sock *sock = get_socket(s);
++  struct lwip_diag_socket_data data;
++  err_t err;
++  if (sock == NULL) return -1;
++  if (NETCONNTYPE_GROUP(netconn_type(sock->conn)) != NETCONN_TCP) {
++    sock_set_errno(sock, EOPNOTSUPP);
++    return -1;
++  }
++  data.conn = sock->conn;
++  data.err = ERR_VAL;
++  data.abort_connection = abort_connection;
++  data.can_send = 0;
++#if LWIP_TCPIP_CORE_LOCKING
++  data.completed_sem = NULL;
++#elif LWIP_NETCONN_SEM_PER_THREAD
++  data.completed_sem = LWIP_NETCONN_THREAD_SEM_GET();
++#else
++  data.completed_sem = &sock->conn->op_completed;
++#endif
++  err = tcpip_send_msg_wait_sem(lwip_diag_socket_callback, &data,
++                               data.completed_sem);
++  if (err == ERR_OK) err = data.err;
++  if (err != ERR_OK) {
++    sock_set_errno(sock, err_to_errno(err));
++    return -1;
++  }
++  return abort_connection ? lwip_close(s) : data.can_send;
++}
++
++/* On failure descriptor ownership stays with the caller for retry. */
++int lwip_abortclose(int s) { return lwip_diag_socket_operation(s, 1); }
++/* Only enqueue another bounded diagnostic line after previous bytes ACKed. */
++int lwip_diag_can_send(int s) { return lwip_diag_socket_operation(s, 0); }
++#endif /* LWIP_TCP */
++
+ int
+ lwip_connect(int s, const struct sockaddr *name, socklen_t namelen)
+ {
+diff --git a/component/common/network/lwip/lwip_v2.0.2/src/include/lwip/sockets.h b/component/common/network/lwip/lwip_v2.0.2/src/include/lwip/sockets.h
+index 58ff2adb7e49e10ca3926b8ddbfc90d2114991f3..7e25b936c7e176499a63a8f444aa744695d25cba 100644
+--- a/component/common/network/lwip/lwip_v2.0.2/src/include/lwip/sockets.h
++++ b/component/common/network/lwip/lwip_v2.0.2/src/include/lwip/sockets.h
+@@ -490,6 +490,11 @@ int lwip_getsockopt (int s, int level, int optname, void *optval, socklen_t *opt
+ int lwip_setsockopt (int s, int level, int optname, const void *optval, socklen_t optlen);
+ int lwip_getsocklasterr(int s);			//Realtek add
+ int lwip_close(int s);
++#if LWIP_TCP
++/* Exclusive task-owned diagnostic TCP clients only; not listener/ISR APIs. */
++int lwip_abortclose(int s);
++int lwip_diag_can_send(int s);
++#endif
+ int lwip_connect(int s, const struct sockaddr *name, socklen_t namelen);
+ int lwip_listen(int s, int backlog);
+ int lwip_recv(int s, void *mem, size_t len, int flags);
 diff --git a/project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/make/utilities_example/Makefile b/project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/make/utilities_example/Makefile
+index ee1deb4..f3cbdde 100644
 --- a/project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/make/utilities_example/Makefile
 +++ b/project/realtek_amebaD_va0_example/GCC-RELEASE/project_hp/asdk/make/utilities_example/Makefile
-@@ -92,3 +92,4 @@
+@@ -92,6 +92,7 @@ CSRC += $(DIR)/mqtt/example_mqtt.c
+ CSRC += $(DIR)/httpd/example_httpd.c
  CSRC += $(DIR)/httpd/example_httpc.c
  CSRC += $(DIR)/ota_http/example_ota_http.c
 +CSRC += $(DIR)/ota_http/gw018_portal.c
  #CSRC += $(DIR)/ota_https/example_ota_https.c
+ CSRC += $(DIR)/ota_sdcard/example_ota_sdcard.c
+ CSRC += $(DIR)/dct/example_dct.c
+@@ -104,6 +105,7 @@ CSRC += $(DIR)/uart_firmware_update/example_uart_update.c
+ CSRC += $(DIR)/cJSON/example_cJSON.c
+ #CSRC += $(DIR)/sdcard_upload_httpd/example_sdcard_upload_httpd.c
+ CSRC += $(DIR)/socket_tcp_trx/example_socket_tcp_trx_1.c
++CSRC += $(DIR)/socket_tcp_trx/gateway_diag.c
+ CSRC += $(DIR)/socket_tcp_trx/example_socket_tcp_trx_2.c
+ # MMF AUDIO EXAMPLE
+ # CSRC += $(DIR)/media_framework/example_media_framework.c
+diff --git a/project/realtek_amebaD_va0_example/inc/inc_hp/FreeRTOSConfig.h b/project/realtek_amebaD_va0_example/inc/inc_hp/FreeRTOSConfig.h
+index be4c6b4aa2132dada287e3a604d7c8d3e43996ad..1fd41c41e8c9ed0f9f6032894cee34a971a00e21 100644
+--- a/project/realtek_amebaD_va0_example/inc/inc_hp/FreeRTOSConfig.h
++++ b/project/realtek_amebaD_va0_example/inc/inc_hp/FreeRTOSConfig.h
+@@ -137,7 +137,7 @@ extern uint32_t SystemCoreClock;
+ #define INCLUDE_vTaskDelayUntil							1
+ #define INCLUDE_vTaskDelay								1
+ #define INCLUDE_pcTaskGetTaskName       				1
+-#define INCLUDE_uxTaskGetStackHighWaterMark				0
++#define INCLUDE_uxTaskGetStackHighWaterMark				1
+ #define INCLUDE_xTaskGetIdleTaskHandle					0
+ #define INCLUDE_eTaskGetState							1
+ #define INCLUDE_xTaskResumeFromISR						0
+diff --git a/project/realtek_amebaD_va0_example/src/src_hp/main.c b/project/realtek_amebaD_va0_example/src/src_hp/main.c
+index c05e1863e491d447869567d63b021f6f794c1893..7ce35f4b4891cac5af721d576aedbc8e818f0318 100644
+--- a/project/realtek_amebaD_va0_example/src/src_hp/main.c
++++ b/project/realtek_amebaD_va0_example/src/src_hp/main.c
+@@ -5,6 +5,10 @@
+ #include "device.h"
+ #include "serial_api.h"
+ #include "gpio_api.h"
++#include "platform_opts.h"
++#if CONFIG_EXAMPLE_SOCKET_TCP_TRX == 1
++#include <socket_tcp_trx/gateway_diag.h>
++#endif
+ 
+ #define UART_TX    _PA_18
+ #define UART_RX    _PA_19
+@@ -150,6 +154,9 @@ static void app_dslp_wake(void)
+ //default main
+ int main(void)
+ {
++#if CONFIG_EXAMPLE_SOCKET_TCP_TRX == 1
++	gateway_diag_boot_event(GW_DIAG_APP_START, 0);
++#endif
+ 	// Init red LED
+ 	gpio_init(&led_red, LED_RED);
+ 	gpio_dir(&led_red, PIN_OUTPUT);    // Direction: Output
+@@ -193,6 +200,9 @@ int main(void)
+ 	/* pre-processor of application example */
+ 	pre_example_entry();
+ 
++#if CONFIG_EXAMPLE_SOCKET_TCP_TRX == 1
++	gateway_diag_boot_event(GW_DIAG_NETWORK_START, 0);
++#endif
+ 	wlan_network();
+ 	
+ 	/* Execute application example */

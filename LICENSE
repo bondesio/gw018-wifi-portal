@@ -2,10 +2,11 @@ MIT License
 
 Copyright (c) 2026 Pablo Bondesio
 
-This license applies only to the original portal component authored for this
-repository and the repository's own tooling and documentation. It does not
-apply to the integration patch insofar as it modifies upstream-owned files,
-or to any separately obtained SDK, toolchain, ImageTool, or other dependency.
+This license applies only to the original portal and diagnostics components,
+Home Assistant OS collector, tests, tooling, and documentation authored for
+this repository. It does not apply to the integration patch insofar as it
+modifies upstream-owned files, or to any separately obtained SDK, toolchain,
+ImageTool, or other dependency.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

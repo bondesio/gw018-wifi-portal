@@ -1,0 +1,20 @@
+name: GW018 Wi-Fi Diagnostics Recorder
+slug: gw018_wifi_log
+version: "1.0.0"
+description: Records validated GW018 application diagnostics from its Wi-Fi stream.
+arch:
+  - amd64
+startup: application
+boot: auto
+init: false
+map:
+  - type: app_config
+    read_only: false
+options:
+  host: 192.0.2.1  # Replace with the gateway station IP in add-on options.
+  port: 81
+  idle_timeout: 20
+schema:
+  host: str
+  port: int(1,65535)
+  idle_timeout: int(1,3600)

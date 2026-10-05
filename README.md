@@ -131,6 +131,22 @@ the endpoint expected on TCP port 8080, then hold the gateway button for at
 least three seconds while the gateway is on Wi-Fi. OTA requires the configured
 host to be reachable and is not a substitute for UART recovery.
 
+## Optional Wi-Fi diagnostics
+
+The WBRG1 application can stream a bounded set of structured Zigbee-bridge and
+network health records on TCP port 81. The stream reports bridge connection
+and byte counters, selected task states, and memory measurements. It does not
+send Wi-Fi credentials, Zigbee payloads, or arbitrary SDK console output, and
+it cannot capture the ROM/KM0 boot console. See
+[`docs/wifi-diagnostics.md`](docs/wifi-diagnostics.md) for the record scope,
+security notes, and Home Assistant OS collector setup.
+
+The optional Home Assistant OS add-on accepts the diagnostics stream and writes
+rotating files under `/config/logs/`, which is persistent HA configuration
+storage. Before starting the add-on, set its `host` option to the gateway's
+station/LAN address; the checked-in `192.0.2.1` value is documentation-only.
+The stream is unauthenticated plain TCP, so use it on a trusted local network.
+
 ## Portal behavior and security
 
 - A short button press opens or closes the `GW018-Setup` access point.
@@ -145,7 +161,8 @@ host to be reachable and is not a substitute for UART recovery.
   on failure it retains the previous profile.
 - A long button hold (at least three seconds) starts the base OTA action.
 
-The portal's authored source and tooling are MIT-licensed as scoped in
+The portal, diagnostics component, Home Assistant OS collector, tests, and
+repository tooling authored for this project are MIT-licensed as scoped in
 `LICENSE`. The integration patch modifies files from the pinned upstream SDK;
 it is provided as a change set for that project and does not relicense those
 files or the SDK. See `THIRD_PARTY_NOTICES.md` and all upstream notices for
