@@ -13,6 +13,8 @@ standalone firmware package. The vendor SDK is obtained from the
 [Jasper GW018-DM SDK fork](https://github.com/jasperw1996/ambd_sdk_GW018-DM) at
 the pinned commit in `tools/prepare-sdk.sh`.
 
+For the integrated full-source version, use the [GW018-DM firmware fork](https://github.com/bondesio/ambd_sdk_GW018-DM). This repository remains the focused overlay distribution; it downloads the pinned SDK separately during preparation.
+
 ## Upstream credit and project relationship
 
 This project builds on the GW018-DM SDK adaptation by
